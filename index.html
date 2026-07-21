@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --primary-dark: #0d47a1;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --text: #1f2933;
+      --muted: #6b7280;
+      --ok: #1e8e3e;
+      --warn: #e8710a;
+      --danger: #d93025;
+      --border: #e3e6ea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Sarabun', 'Noto Sans Thai', Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff;
+      padding: 18px 24px;
+    }
+    header h1 { margin: 0; font-size: 20px; }
+    header p { margin: 4px 0 0; font-size: 13px; opacity: 0.9; }
+
+    nav {
+      display: flex;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    nav button {
+      flex: 1;
+      min-width: 140px;
+      padding: 14px 10px;
+      border: none;
+      background: none;
+      font-size: 14px;
+      cursor: pointer;
+      color: var(--muted);
+      border-bottom: 3px solid transparent;
+    }
+    nav button.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      font-weight: 600;
+    }
+
+    main { padding: 20px; max-width: 1200px; margin: 0 auto; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+
+    .card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border: 1px solid var(--border);
+    }
+    .card h3 { margin-top: 0; font-size: 15px; color: var(--muted); font-weight: 500; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px; margin-bottom: 16px; }
+    .stat-value { font-size: 26px; font-weight: 700; color: var(--primary-dark); }
+    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
+    .filters label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    input, select { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; }
+    button.btn {
+      background: var(--primary); color: #fff; border: none; padding: 9px 16px;
+      border-radius: 6px; cursor: pointer; font-size: 14px; font-family: inherit;
+    }
+    button.btn:hover { background: var(--primary-dark); }
+    button.btn.secondary { background: #fff; color: var(--primary); border: 1px solid var(--primary); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: right; }
+    th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+    th { background: #f0f4f9; color: var(--muted); font-weight: 600; position: sticky; top: 0; }
+    td input, td select { width: 100%; padding: 5px 6px; font-size: 13px; }
+    .table-wrap { max-height: 460px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+
+    .badge { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .badge.ok { background: #e6f4ea; color: var(--ok); }
+    .badge.warn { background: #fef3e6; color: var(--warn); }
+    .badge.danger { background: #fce8e6; color: var(--danger); }
+
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: 10px; padding: 40px;
+      text-align: center; color: var(--muted); cursor: pointer; transition: 0.2s;
+    }
+    .drop-zone:hover { border-color: var(--primary); color: var(--primary); }
+    .charts-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; }
+    @media (max-width: 800px) { .charts-grid { grid-template-columns: 1fr; } }
+
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; background: var(--text); color: #fff;
+      padding: 12px 18px; border-radius: 8px; font-size: 14px; opacity: 0; transition: 0.3s;
+      pointer-events: none; z-index: 999;
+    }
+    .toast.show { opacity: 1; }
+    .spinner {
+      border: 3px solid #eee; border-top: 3px solid var(--primary); border-radius: 50%;
+      width: 18px; height: 18px; animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .row-actions button { margin-left: 4px; font-size: 12px; padding: 4px 8px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>💊 ระบบติดตามคลังยาเสพติด</h1>
+  <p>โรงพยาบาลเขวาสินรินทร์ — กลุ่มงานเภสัชกรรมและคุ้มครองผู้บริโภค</p>
+</header>
+
+<nav>
+  <button class="tab-btn active" data-tab="dashboard">📊 แดชบอร์ด</button>
+  <button class="tab-btn" data-tab="import">📄 นำเข้าไฟล์ PDF/รูปภาพ</button>
+  <button class="tab-btn" data-tab="prices">💰 จัดการราคายา</button>
+  <button class="tab-btn" data-tab="reports">🗂️ สถานะการส่งรายงาน</button>
+</nav>
+
+<main>
+
+  <!-- ================= DASHBOARD ================= -->
+  <section id="dashboard" class="tab active">
+    <div class="card">
+      <div class="filters">
+        <div>
+          <label>ตั้งแต่วันที่ (วันที่บันทึกข้อมูล)</label>
+          <input type="date" id="dashStart">
+        </div>
+        <div>
+          <label>ถึงวันที่</label>
+          <input type="date" id="dashEnd">
+        </div>
+        <button class="btn" onclick="loadDashboard()">🔍 กรองข้อมูล</button>
+        <button class="btn secondary" onclick="clearDashFilter()">ล้างตัวกรอง</button>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="card">
+        <h3>มูลค่าการใช้ยาเสพติด (ตามช่วงที่กรอง)</h3>
+        <div class="stat-value" id="statUsageValue">-</div>
+        <div class="stat-sub" id="statRecordCount">-</div>
+      </div>
+      <div class="card">
+        <h3>มูลค่าคงคลังปัจจุบัน (ล่าสุดของแต่ละรายการยา)</h3>
+        <div class="stat-value" id="statInventoryValue">-</div>
+      </div>
+      <div class="card">
+        <h3>สถานะการส่งรายงาน</h3>
+        <div id="statReportBadges" class="stat-sub">-</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="card">
+        <h3>มูลค่าการใช้ยาเสพติดตามช่วงเวลา (รายเดือน)</h3>
+        <canvas id="timelineChart" height="220"></canvas>
+      </div>
+      <div class="card">
+        <h3>ปริมาณการใช้แยกตามรายการยา (Top 10)</h3>
+        <canvas id="usageByDrugChart" height="220"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= IMPORT ================= -->
+  <section id="import" class="tab">
+    <div class="card">
+      <h3>1. อัปโหลดไฟล์สรุปคลังยาเสพติดรายเดือน (PDF หรือรูปภาพ)</h3>
+      <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+        <div id="dropText">📎 คลิกเพื่อเลือกไฟล์ PDF / JPG / PNG</div>
+        <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="handleFileSelect(event)">
+      </div>
+      <div style="margin-top:12px" id="ocrStatus"></div>
+    </div>
+
+    <div class="card" id="previewCard" style="display:none">
+      <h3>2. ตรวจสอบ/แก้ไขข้อมูลก่อนบันทึก (ผลลัพธ์จาก OCR อาจไม่ถูกต้อง 100% กรุณาตรวจทาน)</h3>
+      <div class="filters">
+        <div>
+          <label>เดือน</label>
+          <select id="importMonth"></select>
+        </div>
+        <div>
+          <label>ปี พ.ศ.</label>
+          <input type="number" id="importYear" style="width:100px">
+        </div>
+        <button class="btn secondary" onclick="addPreviewRow()">+ เพิ่มแถว</button>
+      </div>
+      <div class="table-wrap">
+        <table id="previewTable">
+          <thead><tr><th>ชื่อยา</th><th>ยกมา</th><th>รับเข้า</th><th>จ่ายออก(ใช้)</th><th>คงเหลือ</th><th>หน่วย</th><th></th></tr></thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px">
+        <button class="btn" onclick="saveImport()">✅ บันทึกเข้าระบบ</button>
+      </div>
+    </div>
+
+    <div class="card" id="rawTextCard" style="display:none">
+      <h3>ข้อความดิบจาก OCR (สำหรับตรวจสอบ)</h3>
+      <pre id="rawTextView" style="white-space:pre-wrap; font-size:12px; max-height:200px; overflow-y:auto; color:var(--muted)"></pre>
+    </div>
+  </section>
+
+  <!-- ================= PRICES ================= -->
+  <section id="prices" class="tab">
+    <div class="card">
+      <h3>อัปโหลดไฟล์ราคายา (Excel .xlsx)</h3>
+      <p style="font-size:13px;color:var(--muted)">
+        ไฟล์ต้องมีคอลัมน์หัวตารางที่มีคำว่า "ชื่อยา" และ "ราคาต่อหน่วย" (มี "รหัสยา", "หน่วยนับ" เพิ่มเติมได้)
+      </p>
+      <div class="drop-zone" onclick="document.getElementById('priceFileInput').click()">
+        📎 คลิกเพื่อเลือกไฟล์ Excel
+        <input type="file" id="priceFileInput" accept=".xlsx" style="display:none" onchange="handlePriceFileSelect(event)">
+      </div>
+      <div style="margin-top:12px" id="priceUploadStatus"></div>
+    </div>
+
+    <div class="card">
+      <h3>รายชื่อยาเสพติดและราคาปัจจุบัน</h3>
+      <div style="margin-bottom:10px">
+        <button class="btn secondary" onclick="addDrugRow()">+ เพิ่มรายการยาด้วยตนเอง</button>
+      </div>
+      <div class="table-wrap">
+        <table id="drugTable">
+          <thead><tr><th>รหัสยา</th><th>ชื่อยา</th><th>หน่วยนับ</th><th>ราคาต่อหน่วย</th><th></th></tr></thead>
+          <tbody id="drugBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= REPORTS ================= -->
+  <section id="reports" class="tab">
+    <div class="card">
+      <h3>สถานะการส่งรายงานคลังยาเสพติดรายเดือน</h3>
+      <div class="table-wrap">
+        <table id="reportTable">
+          <thead><tr><th>เดือน</th><th>ปี พ.ศ.</th><th>วันครบกำหนดส่ง</th><th>วันที่ส่งจริง</th><th>สถานะ</th><th>ผู้ส่ง</th><th>หมายเหตุ</th><th></th></tr></thead>
+          <tbody id="reportBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+  'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+let timelineChartInstance = null;
+let usageByDrugChartInstance = null;
+
+// ---------- Navigation ----------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'prices') loadDrugList();
+    if (btn.dataset.tab === 'reports') loadReportList();
+  });
+});
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ---------- Dashboard ----------
+function loadDashboard() {
+  const start = document.getElementById('dashStart').value;
+  const end = document.getElementById('dashEnd').value;
+  document.getElementById('statUsageValue').innerHTML = '<span class="spinner"></span>';
+  google.script.run.withSuccessHandler(renderDashboard).getDashboardData(start, end);
+}
+function clearDashFilter() {
+  document.getElementById('dashStart').value = '';
+  document.getElementById('dashEnd').value = '';
+  loadDashboard();
+}
+function renderDashboard(data) {
+  document.getElementById('statUsageValue').textContent = '฿' + Number(data.totalUsageValue).toLocaleString(undefined,{maximumFractionDigits:2});
+  document.getElementById('statRecordCount').textContent = data.recordCount + ' รายการที่บันทึกในช่วงนี้';
+  document.getElementById('statInventoryValue').textContent = '฿' + Number(data.currentInventoryValue).toLocaleString(undefined,{maximumFractionDigits:2});
+
+  const badgesEl = document.getElementById('statReportBadges');
+  const s = data.reportSummary;
+  badgesEl.innerHTML =
+    '<span class="badge ok">ส่งแล้ว ' + s['ส่งแล้ว'] + '</span> ' +
+    '<span class="badge warn">รอส่ง ' + s['รอส่ง'] + '</span> ' +
+    '<span class="badge danger">เกินกำหนด ' + s['เกินกำหนด'] + '</span>';
+
+  // timeline chart
+  const tlLabels = Object.keys(data.usageTimeline);
+  const tlValues = tlLabels.map(k => data.usageTimeline[k]);
+  if (timelineChartInstance) timelineChartInstance.destroy();
+  timelineChartInstance = new Chart(document.getElementById('timelineChart'), {
+    type: 'line',
+    data: { labels: tlLabels, datasets: [{ label: 'มูลค่าการใช้ (บาท)', data: tlValues, borderColor: '#1a73e8', backgroundColor: 'rgba(26,115,232,0.1)', fill: true, tension: 0.3 }] },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  // usage by drug chart (top 10)
+  const entries = Object.entries(data.usageByDrug).sort((a,b) => b[1]-a[1]).slice(0,10);
+  if (usageByDrugChartInstance) usageByDrugChartInstance.destroy();
+  usageByDrugChartInstance = new Chart(document.getElementById('usageByDrugChart'), {
+    type: 'bar',
+    data: { labels: entries.map(e=>e[0]), datasets: [{ label: 'ปริมาณการใช้', data: entries.map(e=>e[1]), backgroundColor: '#0d47a1' }] },
+    options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } } }
+  });
+}
+
+// ---------- Import ----------
+let currentFileName = '';
+document.getElementById('importMonth').innerHTML = THAI_MONTHS.map(m => `<option>${m}</option>`).join('');
+document.getElementById('importYear').value = new Date().getFullYear() + 543;
+
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  currentFileName = file.name;
+  document.getElementById('dropText').innerHTML = '📄 ' + file.name;
+  document.getElementById('ocrStatus').innerHTML = '<span class="spinner"></span> กำลังอ่านข้อมูลด้วย OCR กรุณารอสักครู่...';
+
+  const reader = new FileReader();
+  reader.onload = function() {
+    const base64 = reader.result.split(',')[1];
+    google.script.run.withSuccessHandler(onOcrDone).withFailureHandler(onOcrError)
+      .ocrExtractFile(base64, file.name, file.type || 'application/pdf');
+  };
+  reader.readAsDataURL(file);
+}
+function onOcrError(err) {
+  document.getElementById('ocrStatus').innerHTML = '❌ เกิดข้อผิดพลาด: ' + err.message;
+}
+function onOcrDone(result) {
+  document.getElementById('ocrStatus').innerHTML = '✅ อ่านข้อมูลสำเร็จ พบ ' + result.parsedRows.length + ' แถว กรุณาตรวจสอบด้านล่าง';
+  document.getElementById('rawTextCard').style.display = 'block';
+  document.getElementById('rawTextView').textContent = result.rawText;
+  window._rawText = result.rawText;
+  renderPreviewTable(result.parsedRows);
+  document.getElementById('previewCard').style.display = 'block';
+
+  // ตั้งค่าเดือน/ปี อัตโนมัติถ้าตรวจพบจากเอกสาร
+  if (result.detectedMonth) {
+    document.getElementById('importMonth').value = result.detectedMonth;
+  }
+  if (result.detectedYear) {
+    document.getElementById('importYear').value = result.detectedYear;
+  }
+}
+function renderPreviewTable(rows) {
+  const body = document.getElementById('previewBody');
+  body.innerHTML = '';
+  rows.forEach(r => addPreviewRow(r));
+}
+function addPreviewRow(r) {
+  r = r || {};
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input value="${r['ชื่อยา']||''}" class="pv-name"></td>
+    <td><input type="number" value="${r['ยกมา']??''}" class="pv-open"></td>
+    <td><input type="number" value="${r['รับเข้า']??''}" class="pv-in"></td>
+    <td><input type="number" value="${r['จ่ายออก(ใช้)']??''}" class="pv-used"></td>
+    <td><input type="number" value="${r['คงเหลือ']??''}" class="pv-remain"></td>
+    <td><input value="${r['หน่วย']||''}" class="pv-unit" style="width:70px"></td>
+    <td class="row-actions"><button class="btn secondary" onclick="this.closest('tr').remove()">ลบ</button></td>
+  `;
+  document.getElementById('previewBody').appendChild(tr);
+}
+function saveImport() {
+  const rows = [];
+  document.querySelectorAll('#previewBody tr').forEach(tr => {
+    rows.push({
+      'ชื่อยา': tr.querySelector('.pv-name').value,
+      'ยกมา': tr.querySelector('.pv-open').value,
+      'รับเข้า': tr.querySelector('.pv-in').value,
+      'จ่ายออก(ใช้)': tr.querySelector('.pv-used').value,
+      'คงเหลือ': tr.querySelector('.pv-remain').value,
+      'หน่วย': tr.querySelector('.pv-unit').value
+    });
+  });
+  const month = document.getElementById('importMonth').value;
+  const year = document.getElementById('importYear').value;
+  showToast('กำลังบันทึก...');
+  google.script.run.withSuccessHandler(res => {
+    let msg = '✅ บันทึกสำเร็จ ' + res.savedCount + ' รายการ';
+    if (res.newDrugsAdded > 0) msg += ' (เพิ่มยาใหม่ในบัญชีราคา ' + res.newDrugsAdded + ' รายการ — อย่าลืมไปกรอกราคาที่แท็บ "จัดการราคายา")';
+    showToast(msg);
+    document.getElementById('previewCard').style.display = 'none';
+    document.getElementById('rawTextCard').style.display = 'none';
+    document.getElementById('ocrStatus').innerHTML = '';
+    document.getElementById('dropText').innerHTML = '📎 คลิกเพื่อเลือกไฟล์ PDF / JPG / PNG';
+    loadDashboard();
+  }).withFailureHandler(err => showToast('❌ ' + err.message))
+    .confirmSaveImport(rows, month, year, currentFileName, window._rawText, '');
+}
+
+// ---------- Prices ----------
+function loadDrugList() {
+  google.script.run.withSuccessHandler(renderDrugTable).getDrugList();
+}
+function renderDrugTable(rows) {
+  const body = document.getElementById('drugBody');
+  body.innerHTML = '';
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input value="${r['รหัสยา']||''}" class="dg-code"></td>
+      <td><input value="${r['ชื่อยา']||''}" class="dg-name"></td>
+      <td><input value="${r['หน่วยนับ']||''}" class="dg-unit"></td>
+      <td><input type="number" value="${r['ราคาต่อหน่วย']||0}" class="dg-price"></td>
+      <td class="row-actions"><button class="btn secondary" onclick="saveDrugRow(this, ${r._row})">บันทึก</button></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+function saveDrugRow(btn, rowNumber) {
+  const tr = btn.closest('tr');
+  const code = tr.querySelector('.dg-code').value;
+  const name = tr.querySelector('.dg-name').value;
+  const unit = tr.querySelector('.dg-unit').value;
+  const price = tr.querySelector('.dg-price').value;
+  google.script.run.withSuccessHandler(() => showToast('✅ บันทึกราคาแล้ว')).updateDrugPrice(rowNumber, code, name, unit, price);
+}
+function addDrugRow() {
+  const body = document.getElementById('drugBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input class="dg-code"></td>
+    <td><input class="dg-name"></td>
+    <td><input class="dg-unit"></td>
+    <td><input type="number" class="dg-price" value="0"></td>
+    <td class="row-actions"><button class="btn secondary" onclick="saveNewDrugRow(this)">เพิ่ม</button></td>
+  `;
+  body.appendChild(tr);
+}
+function saveNewDrugRow(btn) {
+  const tr = btn.closest('tr');
+  const code = tr.querySelector('.dg-code').value;
+  const name = tr.querySelector('.dg-name').value;
+  const unit = tr.querySelector('.dg-unit').value;
+  const price = tr.querySelector('.dg-price').value;
+  google.script.run.withSuccessHandler(() => { showToast('✅ เพิ่มแล้ว'); loadDrugList(); }).addDrugManually(code, name, unit, price);
+}
+function handlePriceFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  document.getElementById('priceUploadStatus').innerHTML = '<span class="spinner"></span> กำลังนำเข้าไฟล์ราคา...';
+  const reader = new FileReader();
+  reader.onload = function() {
+    const base64 = reader.result.split(',')[1];
+    google.script.run.withSuccessHandler(res => {
+      document.getElementById('priceUploadStatus').innerHTML = '✅ นำเข้าสำเร็จ ' + res.upserted + ' รายการ';
+      loadDrugList();
+    }).withFailureHandler(err => {
+      document.getElementById('priceUploadStatus').innerHTML = '❌ ' + err.message;
+    }).importPriceExcel(base64, file.name);
+  };
+  reader.readAsDataURL(file);
+}
+
+// ---------- Reports ----------
+function loadReportList() {
+  google.script.run.withSuccessHandler(renderReportTable).getReportStatusList();
+}
+function renderReportTable(rows) {
+  const body = document.getElementById('reportBody');
+  body.innerHTML = '';
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const due = r['วันครบกำหนดส่ง'] ? new Date(r['วันครบกำหนดส่ง']).toISOString().slice(0,10) : '';
+    const sent = r['วันที่ส่งจริง'] ? new Date(r['วันที่ส่งจริง']).toISOString().slice(0,10) : '';
+    tr.innerHTML = `
+      <td>${r['เดือน']}</td>
+      <td>${r['ปี พ.ศ.']}</td>
+      <td><input type="date" value="${due}" class="rp-due"></td>
+      <td><input type="date" value="${sent}" class="rp-sent"></td>
+      <td>
+        <select class="rp-status">
+          <option ${r['สถานะ']==='รอส่ง'?'selected':''}>รอส่ง</option>
+          <option ${r['สถานะ']==='ส่งแล้ว'?'selected':''}>ส่งแล้ว</option>
+          <option ${r['สถานะ']==='เกินกำหนด'?'selected':''}>เกินกำหนด</option>
+        </select>
+      </td>
+      <td><input value="${r['ผู้ส่ง']||''}" class="rp-by"></td>
+      <td><input value="${r['หมายเหตุ']||''}" class="rp-note"></td>
+      <td class="row-actions"><button class="btn secondary" onclick="saveReportRow(this, ${r._row})">บันทึก</button></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+function saveReportRow(btn, rowNumber) {
+  const tr = btn.closest('tr');
+  const due = tr.querySelector('.rp-due').value;
+  const sent = tr.querySelector('.rp-sent').value;
+  const status = tr.querySelector('.rp-status').value;
+  const by = tr.querySelector('.rp-by').value;
+  const note = tr.querySelector('.rp-note').value;
+  google.script.run.withSuccessHandler(() => showToast('✅ บันทึกสถานะแล้ว'))
+    .updateReportStatus(rowNumber, due, sent, status, by, note);
+}
+
+// ---------- Init ----------
+loadDashboard();
+</script>
+
+</body>
+</html>
